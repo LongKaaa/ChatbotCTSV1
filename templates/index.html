@@ -569,12 +569,21 @@
 
         async function checkAuthStatus() {
             try {
-                const res = await fetch(`${API_BASE_URL}/api/check_auth`, {
-                    credentials: 'include' // <--- THÊM DÒNG NÀY
+                // Thêm ?t=... để đảm bảo mỗi lần gọi là một URL khác nhau -> Không bị cache
+                const res = await fetch(`${API_BASE_URL}/api/check_auth?t=${Date.now()}`, {
+                    credentials: 'include'
                 });
                 const data = await res.json();
                 isUserLoggedIn = data.is_logged_in;
-                if(isUserLoggedIn) { document.getElementById('current-username').innerText = data.username; loadConversationList(); }
+                if(isUserLoggedIn) { 
+                    document.getElementById('current-username').innerText = data.username; 
+                    loadConversationList(); 
+                } else {
+                    // Nếu chưa đăng nhập thì đảm bảo UI sạch sẽ
+                    document.getElementById('current-username').innerText = "User";
+                    document.getElementById('conversation-list').innerHTML = "";
+                    currentConvId = null;
+                }
             } catch(e){}
         }
         checkAuthStatus();
@@ -731,8 +740,18 @@
             const d = await res.json();
             if(d.success) { alert("OK"); switchAuth('login'); } else document.getElementById('reg-msg').innerText = d.message;
         }
-        async function handleLogout() { await fetch(`${API_BASE_URL}/api/logout`, {method:'POST'}); location.reload(); }
-        
+        async function handleLogout() { 
+            try {
+                await fetch(`${API_BASE_URL}/api/logout`, {
+                    method:'POST',
+                    credentials: 'include' // Quan trọng
+                }); 
+                // Xóa biến local
+                isUserLoggedIn = false;
+                // Reload trang để reset giao diện
+                location.reload(); 
+            } catch(e) { console.error(e); location.reload(); }
+        }
         function exploreMajor(n) {
             if(!isUserLoggedIn) { authModal.classList.add('active'); return; }
             if(!chatOpen) toggleChat();

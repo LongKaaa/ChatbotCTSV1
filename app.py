@@ -42,7 +42,19 @@ def get_history():
     return jsonify(history_data)
 
 # --- 1. CẤU HÌNH DATABASE ---
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///site.db'
+database_url = os.environ.get("DATABASE_URL")
+
+if database_url:
+    # Fix lỗi nhỏ: Render/Supabase trả về "postgres://" nhưng thư viện cần "postgresql://"
+    if database_url.startswith("postgres://"):
+        database_url = database_url.replace("postgres://", "postgresql://", 1)
+    app.config['SQLALCHEMY_DATABASE_URI'] = database_url
+    print(">>> Đang sử dụng PostgreSQL (Online)")
+else:
+    # Nếu không tìm thấy (tức là đang chạy trên máy tính), dùng SQLite
+    app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///site.db'
+    print(">>> Đang sử dụng SQLite (Local)")
+
 app.config['SECRET_KEY'] = 'khoa-cntt-hcmus-secret-key-2024'
 db = SQLAlchemy(app)
 
@@ -265,7 +277,9 @@ def login():
 @login_required
 def logout():
     logout_user()
-    return jsonify({"success": True})
+    response = jsonify({"success": True})
+    response.set_cookie('session', '', expires=0, secure=True, samesite='None')
+    return response
 
 @app.route('/api/check_auth', methods=['GET'])
 def check_auth():
@@ -312,7 +326,13 @@ def delete_conversation(conv_id):
     db.session.delete(conv)
     db.session.commit()
     return jsonify({"success": True})
-
+@app.after_request
+def add_header(response):
+    # Yêu cầu trình duyệt không bao giờ cache các API
+    response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, post-check=0, pre-check=0, max-age=0'
+    response.headers['Pragma'] = 'no-cache'
+    response.headers['Expires'] = '-1'
+    return response
 # 5. API Đổi tên cuộc hội thoại
 @app.route('/api/conversation/rename/<int:conv_id>', methods=['PUT'])
 @login_required
