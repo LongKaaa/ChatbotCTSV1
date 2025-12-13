@@ -1,26 +1,56 @@
 import os
 from flask import Flask, render_template, request, jsonify
 import google.generativeai as genai
+from flask_sqlalchemy import SQLAlchemy
+from flask_login import UserMixin, LoginManager, login_user, logout_user, login_required, current_user
+from werkzeug.security import generate_password_hash, check_password_hash 
+from datetime import datetime
 from docx import Document
 from pypdf import PdfReader
 import markdown
-from flask_sqlalchemy import SQLAlchemy
-from flask_login import UserMixin
-from datetime import datetime
 from flask_cors import CORS
 
 app = Flask(__name__)
 CORS(app)
-# ---  CẤU HÌNH DATABASE ---
+@app.route('/api/history', methods=['GET'])
+@login_required
+def get_history():
+    # Lấy toàn bộ tin nhắn của user hiện tại, sắp xếp theo thời gian
+    messages = ChatMessage.query.filter_by(user_id=current_user.id).order_by(ChatMessage.timestamp).all()
+    
+    history_data = []
+    for msg in messages:
+        history_data.append({
+            "role": msg.role,
+            "content": msg.content,
+            # Chỉ lấy 30 ký tự đầu làm tiêu đề cho sidebar nếu là tin nhắn user
+            "preview": msg.content[:30] + "..." if len(msg.content) > 30 else msg.content
+        })
+    
+    return jsonify(history_data)
+
+# --- 1. CẤU HÌNH DATABASE ---
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///site.db'
-app.config['SECRET_KEY'] = 'khoa-cntt-hcmus-secret-key-2024' 
+app.config['SECRET_KEY'] = 'khoa-cntt-hcmus-secret-key-2024'
 db = SQLAlchemy(app)
 
-# --- CẤU HÌNH AI (API KEY) ---
+# --- THÊM: CẤU HÌNH LOGIN MANAGER ---
+login_manager = LoginManager()
+login_manager.init_app(app)
+login_manager.login_view = 'login' # Không dùng route này nhưng cần khai báo
+
+@login_manager.user_loader
+def load_user(user_id):
+    return User.query.get(int(user_id))
+# --- 2. CẤU HÌNH AI GEMINI ---
+# ⚠️ QUAN TRỌNG: Thay API Key MỚI của bạn vào đây
 MY_API_KEY = os.environ.get("GOOGLE_API_KEY")
 genai.configure(api_key=MY_API_KEY)
+
+# Dùng model chuẩn 2.5-flash
 model = genai.GenerativeModel('gemini-2.5-flash')
-# --- HÀM ĐỆ QUY ĐỌC DỮ LIỆU ---
+
+# Đọc dữ liệu
 def read_data_recursive(path):
     combined_text = ""
     if not os.path.exists(path):
@@ -130,7 +160,7 @@ VÍ DỤ TƯ DUY ĐÚNG (Chain of Thought):
 
 5. VỀ TRẢ LỜI ĐIỂM CHUẨN
     - Khi người dùng hỏi điểm chuẩn của ngành, LUÔN TRẢ LỜI ĐIỂM CHUẨN 2025.
-    - Khi được hỏi về điểm chuẩn, luôn hỏi theo thứ tự sau trước khi đưa ra điểm chuẩn: ngành học, sau đó là phương thức xét tuyển. Sau khi có cả hai thông tin trên mới đưa ra câu trả lời.
+    - Khi tiếp nhận câu hỏi về điểm chuẩn, hệ thống cần xác định rõ Ngành học và Phương thức xét tuyển. Nếu người dùng chưa cung cấp tên ngành, hãy hỏi lại để làm rõ. Nếu đã có tên ngành nhưng thiếu phương thức xét tuyển, hãy cung cấp bảng điểm của tất cả các phương thức. Chỉ trả lời kết quả cụ thể khi đã có đầy đủ hai thông tin trên.
     - TUYỆT ĐỐI KHÔNG TRẢ LỜI CÂU HỎI DƯỚI DẠNG BẢNG.
 
 6. VỀ TÊN GỌI KHÁC CỦA CÁC NGÀNH
@@ -168,64 +198,169 @@ chat_session = model.start_chat(history=[
     {"role": "model", "parts": ["Dạ, mình đã hiểu. FIT-Bot sẵn sàng hỗ trợ."]}
 ])
 
-# --- 3. ĐỊNH NGHĨA BẢNG DỮ LIỆU (MODELS) ---
+# --- 3. MODELS (CẬP NHẬT CẤU TRÚC MỚI) ---
 
-# Bảng Người dùng (User)
 class User(db.Model, UserMixin):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(20), unique=True, nullable=False)
     password = db.Column(db.String(60), nullable=False)
-    # Quan hệ: Một user có nhiều tin nhắn
-    messages = db.relationship('ChatMessage', backref='author', lazy=True)
+    conversations = db.relationship('Conversation', backref='owner', lazy=True)
 
-# Bảng Lịch sử Chat
+class Conversation(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    title = db.Column(db.String(100), default="Cuộc trò chuyện mới")
+    timestamp = db.Column(db.DateTime, default=datetime.utcnow)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    messages = db.relationship('ChatMessage', backref='conversation', lazy=True, cascade="all, delete-orphan")
+
 class ChatMessage(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     content = db.Column(db.Text, nullable=False)
-    role = db.Column(db.String(10), nullable=False) # "user" hoặc "bot"
+    role = db.Column(db.String(10), nullable=False) # 'user' hoặc 'bot'
     timestamp = db.Column(db.DateTime, default=datetime.utcnow)
-    # Khóa ngoại: Liên kết với bảng User
-    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    conversation_id = db.Column(db.Integer, db.ForeignKey('conversation.id'), nullable=False)
 
 
 
-# --- 4. CÁC ROUTE (Đường dẫn) ---
+# --- 4. ROUTES ---
 
 @app.route('/')
 def home():
     return render_template('index.html')
 
+# AUTHENTICATION APIs
+@app.route('/api/register', methods=['POST'])
+def register():
+    data = request.json
+    if User.query.filter_by(username=data['username']).first():
+        return jsonify({"success": False, "message": "Tên đăng nhập đã tồn tại"})
+    hashed_pw = generate_password_hash(data['password'])
+    new_user = User(username=data['username'], password=hashed_pw)
+    db.session.add(new_user)
+    db.session.commit()
+    return jsonify({"success": True, "message": "Đăng ký thành công"})
+
+@app.route('/api/login', methods=['POST'])
+def login():
+    data = request.json
+    user = User.query.filter_by(username=data['username']).first()
+    if user and check_password_hash(user.password, data['password']):
+        login_user(user)
+        return jsonify({"success": True})
+    return jsonify({"success": False, "message": "Sai tên đăng nhập hoặc mật khẩu"})
+
+@app.route('/api/logout', methods=['POST'])
+@login_required
+def logout():
+    logout_user()
+    return jsonify({"success": True})
+
+@app.route('/api/check_auth', methods=['GET'])
+def check_auth():
+    if current_user.is_authenticated:
+        return jsonify({"is_logged_in": True, "username": current_user.username})
+    return jsonify({"is_logged_in": False})
+
+# --- CONVERSATION APIs (MỚI) ---
+
+# 1. Lấy danh sách các cuộc hội thoại
+@app.route('/api/conversations', methods=['GET'])
+@login_required
+def get_conversations():
+    convs = Conversation.query.filter_by(user_id=current_user.id).order_by(Conversation.timestamp.desc()).all()
+    return jsonify([{ "id": c.id, "title": c.title } for c in convs])
+
+# 2. Tạo cuộc hội thoại mới
+@app.route('/api/conversation/new', methods=['POST'])
+@login_required
+def new_conversation():
+    new_conv = Conversation(user_id=current_user.id, title="Cuộc trò chuyện mới")
+    db.session.add(new_conv)
+    db.session.commit()
+    return jsonify({"success": True, "id": new_conv.id})
+
+# 3. Lấy nội dung tin nhắn của 1 hội thoại
+@app.route('/api/conversation/<int:conv_id>', methods=['GET'])
+@login_required
+def get_conversation_content(conv_id):
+    conv = Conversation.query.get_or_404(conv_id)
+    if conv.user_id != current_user.id:
+        return jsonify({"error": "Không có quyền truy cập"}), 403
+    
+    messages = ChatMessage.query.filter_by(conversation_id=conv.id).order_by(ChatMessage.timestamp).all()
+    return jsonify([{ "role": m.role, "content": m.content } for m in messages])
+# 4. API Xóa cuộc hội thoại
+@app.route('/api/conversation/delete/<int:conv_id>', methods=['DELETE'])
+@login_required
+def delete_conversation(conv_id):
+    conv = Conversation.query.get_or_404(conv_id)
+    if conv.user_id != current_user.id:
+        return jsonify({"success": False, "message": "Unauthorized"}), 403
+    
+    db.session.delete(conv)
+    db.session.commit()
+    return jsonify({"success": True})
+
+# 5. API Đổi tên cuộc hội thoại
+@app.route('/api/conversation/rename/<int:conv_id>', methods=['PUT'])
+@login_required
+def rename_conversation(conv_id):
+    data = request.json
+    new_title = data.get('title')
+    
+    conv = Conversation.query.get_or_404(conv_id)
+    if conv.user_id != current_user.id:
+        return jsonify({"success": False, "message": "Unauthorized"}), 403
+    
+    conv.title = new_title
+    db.session.commit()
+    return jsonify({"success": True})
+# 4. Gửi tin nhắn (Cập nhật để hỗ trợ conversation_id)
 @app.route('/api/chat', methods=['POST'])
+@login_required
 def chat():
     data = request.json
     user_question = data.get('message')
+    conv_id = data.get('conversation_id')
 
-    if not user_question:
-        return jsonify({"response": "Bạn chưa nhập câu hỏi nào cả!"})
-    
+    if not user_question: return jsonify({"response": "Rỗng"})
+
+    # ... (giữ nguyên phần xử lý conversation_id) ...
+    if not conv_id:
+        new_conv = Conversation(user_id=current_user.id, title=user_question[:30])
+        db.session.add(new_conv)
+        db.session.commit()
+        conv_id = new_conv.id
+    else:
+        conv = Conversation.query.get(conv_id)
+        if conv and conv.title == "Cuộc trò chuyện mới":
+            conv.title = user_question[:40] + "..." if len(user_question) > 40 else user_question
+            db.session.commit()
+
     try:
         response = chat_session.send_message(user_question)
-        bot_reply = markdown.markdown(response.text)
-        
-        # --- SAU NÀY: CODE LƯU VÀO DB SẼ NẰM Ở ĐÂY ---
-        # if current_user.is_authenticated:
-        #    lưu_tin_nhắn_user(user_question)
-        #    lưu_tin_nhắn_bot(bot_reply)
-        
+        bot_reply = markdown.markdown(
+            response.text, 
+            extensions=['extra', 'nl2br', 'sane_lists']
+        )
+        user_msg = ChatMessage(content=user_question, role='user', conversation_id=conv_id)
+        bot_msg = ChatMessage(content=bot_reply, role='bot', conversation_id=conv_id)
+        db.session.add_all([user_msg, bot_msg])
+        db.session.commit()
+
+        return jsonify({
+            "response": bot_reply,
+            "conversation_id": conv_id,
+            "new_title": conv.title 
+        })
+
     except Exception as e:
-        bot_reply = "Xin lỗi, hệ thống đang quá tải. Bạn thử lại sau nhé!"
-        print(f"Lỗi: {e}") 
-    
-    return jsonify({"response": bot_reply})
-
-
+        print(f"Lỗi chat: {e}")
+        return jsonify({"response": "Hệ thống đang bận, vui lòng thử lại sau."})
 
 # --- 5. CHẠY ỨNG DỤNG ---
 if __name__ == '__main__':
-    # Bước quan trọng: Tạo file database nếu chưa có
     with app.app_context():
         db.create_all()
         print("Đã khởi tạo Database thành công!")
-
-    # Chạy ở cổng 8080 để tránh lỗi kẹt cổng
     app.run(debug=True, port=8080)
