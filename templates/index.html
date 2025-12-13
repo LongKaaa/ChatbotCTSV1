@@ -569,7 +569,9 @@
 
         async function checkAuthStatus() {
             try {
-                const res = await fetch(`${API_BASE_URL}/api/check_auth`);
+                const res = await fetch(`${API_BASE_URL}/api/check_auth`, {
+                    credentials: 'include' // <--- THÊM DÒNG NÀY
+                });
                 const data = await res.json();
                 isUserLoggedIn = data.is_logged_in;
                 if(isUserLoggedIn) { document.getElementById('current-username').innerText = data.username; loadConversationList(); }
@@ -590,7 +592,9 @@
         // --- API & LOGIC ---
         async function loadConversationList() {
             try {
-                const res = await fetch(`${API_BASE_URL}/api/conversations`);
+                const res = await fetch(`${API_BASE_URL}/api/conversations`, {
+                    credentials: 'include' // <--- THÊM DÒNG NÀY
+                });
                 if(!res.ok) return;
                 const convs = await res.json();
                 const list = document.getElementById('conversation-list');
@@ -614,7 +618,9 @@
 
         async function loadConversationContent(id) {
             currentConvId = id; loadConversationList();
-            const res = await fetch(`${API_BASE_URL}/api/conversation/${id}`);
+            const res = await fetch(`${API_BASE_URL}/api/conversation/${id}`, {
+                credentials: 'include' // <--- THÊM DÒNG NÀY
+            });
             const msgs = await res.json();
             const container = document.getElementById('chat-history');
             container.innerHTML = '';
@@ -624,7 +630,10 @@
         }
 
         async function createNewChat() {
-            const res = await fetch(`${API_BASE_URL}/api/conversation/new`, {method:'POST'});
+            const res = await fetch(`${API_BASE_URL}/api/conversation/new`, {
+                    method: 'POST',
+                    credentials: 'include' // <--- Quan trọng
+                });
             const data = await res.json();
             if(data.success) {
                 currentConvId = data.id;
@@ -637,7 +646,10 @@
         async function deleteConversation(id) {
             if(!confirm("Xóa cuộc trò chuyện này?")) return;
             try {
-                const res = await fetch(`${API_BASE_URL}/api/conversation/delete/${id}`, {method:'DELETE'});
+                const res = await fetch(`${API_BASE_URL}/api/conversation/delete/${id}`, {
+                    method: 'DELETE',
+                    credentials: 'include' // <--- Quan trọng
+                });
                 if(res.ok) {
                     if(currentConvId === id) { currentConvId = null; document.getElementById('chat-history').innerHTML = ''; }
                     loadConversationList();
@@ -649,7 +661,12 @@
             const oldName = document.getElementById(`title-${id}`).innerText;
             const newName = prompt("Tên mới:", oldName);
             if(newName && newName.trim()) {
-                await fetch(`/api/conversation/rename/${id}`, { method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify({title: newName}) });
+                await fetch(`${API_BASE_URL}/api/conversation/rename/${id}`, { // <--- Đã thêm API_BASE_URL
+                        method: 'PUT', 
+                        headers: {'Content-Type':'application/json'},
+                        credentials: 'include', // <--- Quan trọng
+                        body: JSON.stringify({title: newName}) 
+                    });
                 loadConversationList();
             }
         }

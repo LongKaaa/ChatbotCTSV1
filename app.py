@@ -11,7 +11,19 @@ import markdown
 from flask_cors import CORS
 
 app = Flask(__name__)
-CORS(app)
+CORS(app, resources={r"/api/*": {
+    "origins": [
+        "https://hcmusaibybopcteam.netlify.app/",  # <-- Thay bằng link Netlify thật của bạn
+        "http://127.0.0.1:5500"              # <-- Để test trên máy
+    ],
+    "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    "allow_headers": ["Content-Type", "Authorization"],
+    "supports_credentials": True  # <--- QUAN TRỌNG NHẤT: Cho phép nhận Cookie
+}})
+
+# CẤU HÌNH COOKIE ĐỂ CHẠY ĐƯỢC TRÊN HTTPS (RENDER)
+app.config['SESSION_COOKIE_SAMESITE'] = 'None'
+app.config['SESSION_COOKIE_SECURE'] = True
 @app.route('/api/history', methods=['GET'])
 @login_required
 def get_history():
