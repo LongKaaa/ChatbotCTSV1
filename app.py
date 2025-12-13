@@ -358,9 +358,14 @@ def chat():
         print(f"Lỗi chat: {e}")
         return jsonify({"response": "Hệ thống đang bận, vui lòng thử lại sau."})
 
+
 # --- 5. CHẠY ỨNG DỤNG ---
+
+# --- THÊM ĐOẠN NÀY RA NGOÀI ĐỂ RENDER CHẠY ĐƯỢC ---
+with app.app_context():
+    db.create_all()
+    print(">>> Đã khởi tạo Database trên Render thành công!")
+# -----------------------------------------------------
+
 if __name__ == '__main__':
-    with app.app_context():
-        db.create_all()
-        print("Đã khởi tạo Database thành công!")
     app.run(debug=True, port=8080)

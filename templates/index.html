@@ -569,7 +569,7 @@
 
         async function checkAuthStatus() {
             try {
-                const res = await fetch('${API_BASE_URL}/api/check_auth');
+                const res = await fetch(`${API_BASE_URL}/api/check_auth`);
                 const data = await res.json();
                 isUserLoggedIn = data.is_logged_in;
                 if(isUserLoggedIn) { document.getElementById('current-username').innerText = data.username; loadConversationList(); }
@@ -590,7 +590,7 @@
         // --- API & LOGIC ---
         async function loadConversationList() {
             try {
-                const res = await fetch('${API_BASE_URL}/api/conversations');
+                const res = await fetch(`${API_BASE_URL}/api/conversations`);
                 if(!res.ok) return;
                 const convs = await res.json();
                 const list = document.getElementById('conversation-list');
@@ -624,7 +624,7 @@
         }
 
         async function createNewChat() {
-            const res = await fetch('${API_BASE_URL}/api/conversation/new', {method:'POST'});
+            const res = await fetch(`${API_BASE_URL}/api/conversation/new`, {method:'POST'});
             const data = await res.json();
             if(data.success) {
                 currentConvId = data.id;
@@ -677,7 +677,7 @@
             document.getElementById('chat-history').insertAdjacentHTML('beforeend', `<div class="msg ai" id="${loadId}"><div class="msg-avatar ai"><i class="fa-solid fa-circle-notch fa-spin"></i></div><div class="msg-content text-gray-500">Processing...</div></div>`);
             
             try {
-                const res = await fetch('${API_BASE_URL}/api/chat', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({message:txt, conversation_id:currentConvId}) });
+                const res = await fetch(`${API_BASE_URL}/api/chat`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({message:txt, conversation_id:currentConvId}) });
                 document.getElementById(loadId).remove();
                 if(res.status===401) { alert("Hết phiên đăng nhập"); location.reload(); return; }
                 const data = await res.json();
@@ -693,18 +693,18 @@
         }
         async function handleLogin() {
             const u=document.getElementById('login-user').value, p=document.getElementById('login-pass').value;
-            const res = await fetch('${API_BASE_URL}/api/login', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({username:u, password:p})});
+            const res = await fetch(`${API_BASE_URL}/api/login`, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({username:u, password:p})});
             const d = await res.json();
             if(d.success) { isUserLoggedIn=true; authModal.classList.remove('active'); document.getElementById('current-username').innerText=u; loadConversationList(); toggleChat(); }
             else document.getElementById('login-msg').innerText = d.message;
         }
         async function handleRegister() {
             const u=document.getElementById('reg-user').value, p=document.getElementById('reg-pass').value;
-            const res = await fetch('${API_BASE_URL}/api/register', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({username:u, password:p})});
+            const res = await fetch(`${API_BASE_URL}/api/register`, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({username:u, password:p})});
             const d = await res.json();
             if(d.success) { alert("OK"); switchAuth('login'); } else document.getElementById('reg-msg').innerText = d.message;
         }
-        async function handleLogout() { await fetch('${API_BASE_URL}/api/logout', {method:'POST'}); location.reload(); }
+        async function handleLogout() { await fetch(`${API_BASE_URL}/api/logout`, {method:'POST'}); location.reload(); }
         
         function exploreMajor(n) {
             if(!isUserLoggedIn) { authModal.classList.add('active'); return; }
