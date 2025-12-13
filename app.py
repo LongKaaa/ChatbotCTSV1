@@ -13,7 +13,7 @@ from flask_cors import CORS
 app = Flask(__name__)
 CORS(app, resources={r"/api/*": {
     "origins": [
-        "https://hcmusaibybopcteam.netlify.app/",  # <-- Thay bằng link Netlify thật của bạn
+        "https://hcmusaibybopcteam.netlify.app",  # <-- Thay bằng link Netlify thật của bạn
         "http://127.0.0.1:5500"              # <-- Để test trên máy
     ],
     "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],

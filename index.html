@@ -710,14 +710,24 @@
         }
         async function handleLogin() {
             const u=document.getElementById('login-user').value, p=document.getElementById('login-pass').value;
-            const res = await fetch(`${API_BASE_URL}/api/login`, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({username:u, password:p})});
+            const res = await fetch(`${API_BASE_URL}/api/login`, {
+                method:'POST', 
+                headers:{'Content-Type':'application/json'}, 
+                credentials: 'include', // <--- BẮT BUỘC PHẢI CÓ DÒNG NÀY
+                body:JSON.stringify({username:u, password:p})
+            });
             const d = await res.json();
             if(d.success) { isUserLoggedIn=true; authModal.classList.remove('active'); document.getElementById('current-username').innerText=u; loadConversationList(); toggleChat(); }
             else document.getElementById('login-msg').innerText = d.message;
         }
         async function handleRegister() {
             const u=document.getElementById('reg-user').value, p=document.getElementById('reg-pass').value;
-            const res = await fetch(`${API_BASE_URL}/api/register`, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({username:u, password:p})});
+            const res = await fetch(`${API_BASE_URL}/api/register`, {
+                method:'POST', 
+                headers:{'Content-Type':'application/json'}, 
+                credentials: 'include', // <--- BẮT BUỘC PHẢI CÓ DÒNG NÀY
+                body:JSON.stringify({username:u, password:p})
+            });
             const d = await res.json();
             if(d.success) { alert("OK"); switchAuth('login'); } else document.getElementById('reg-msg').innerText = d.message;
         }
