@@ -1,0 +1,720 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FIT @ HCMUS | THE SINGULARITY</title>
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://unpkg.com/three@0.128.0/examples/js/postprocessing/EffectComposer.js"></script>
+    <script src="https://unpkg.com/three@0.128.0/examples/js/postprocessing/RenderPass.js"></script>
+    <script src="https://unpkg.com/three@0.128.0/examples/js/postprocessing/ShaderPass.js"></script>
+    <script src="https://unpkg.com/three@0.128.0/examples/js/shaders/CopyShader.js"></script>
+    <script src="https://unpkg.com/three@0.128.0/examples/js/shaders/LuminosityHighPassShader.js"></script>
+    <script src="https://unpkg.com/three@0.128.0/examples/js/postprocessing/UnrealBloomPass.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/ScrollTrigger.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/gh/studio-freight/lenis@1.0.29/bundled/lenis.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Syncopate:wght@400;700&family=Space+Grotesk:wght@300;400;500;700&family=Montserrat:wght@800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <style>
+        /* --- FONTS --- */
+        @import url('https://fonts.googleapis.com/css2?family=Tektur:wght@400..900&display=swap');
+        /* --- 0. CONFIG --- */
+        :root {
+            --c-black: #050505;
+            --c-blue: #3b82f6;
+            --c-cyan: #06b6d4;
+            --c-white: #ffffff;
+            --font-display: "Tektur", sans-serif;
+            --font-body: 'Space Grotesk', sans-serif;
+        }
+
+        * { box-sizing: border-box; cursor: none; /* Tắt chuột mặc định */ }
+        
+        body {
+            margin: 0; padding: 0; background-color: var(--c-black);
+            color: var(--c-white); font-family: var(--font-body);
+            overflow-x: hidden;
+        }
+
+        /* --- 1. NEW CURSOR (Dấu cộng Neon) --- */
+        #cursor {
+            position: fixed; top: 0; left: 0; width: 30px; height: 30px;
+            pointer-events: none; z-index: 99999; transform: translate(-50%, -50%);
+            display: flex; align-items: center; justify-content: center;
+            transition: width 0.3s, height 0.3s;
+        }
+        #cursor::before, #cursor::after {
+            content: ''; position: absolute; background: white;
+            transition: 0.3s; box-shadow: 0 0 10px white;
+        }
+        #cursor::before { width: 100%; height: 2px; } /* Ngang */
+        #cursor::after { width: 2px; height: 100%; } /* Dọc */
+
+        body.hovering #cursor {
+            width: 50px; height: 50px; transform: translate(-50%, -50%) rotate(45deg); 
+        }
+        body.hovering #cursor::before, body.hovering #cursor::after {
+            background: var(--c-cyan); box-shadow: 0 0 15px var(--c-cyan);
+        }
+
+        /* --- 2. 3D BACKGROUND --- */
+        #webgl-canvas {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            z-index: -1; opacity: 0; transition: opacity 2s ease;
+        }
+        body.loaded #webgl-canvas { opacity: 1; }
+
+        /* --- 3. PRELOADER --- */
+        #preloader {
+            position: fixed; inset: 0; background: #000; z-index: 99999;
+            display: flex; justify-content: center; align-items: center; flex-direction: column;
+        }
+        .loader-text {
+            font-family: var(--font-display); font-weight: 700; font-size: 2rem;
+            letter-spacing: 10px; color: transparent; -webkit-text-stroke: 1px white; opacity: 0.5;
+        }
+        .loader-bar {
+            width: 0%; height: 2px; background: var(--c-blue);
+            margin-top: 20px; transition: width 0.1s; box-shadow: 0 0 20px var(--c-blue);
+        }
+        .loader-percent { font-family: var(--font-body); font-size: 12px; margin-top: 10px; color: #666; }
+
+        /* --- 4. TYPOGRAPHY --- */
+        .section { position: relative; width: 100%; padding: 10vh 5vw; }
+        .hero-section { height: 100vh; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+        .big-text {
+            font-family: 'Montserrat', sans-serif; font-size: 12vw; line-height: 0.8;
+            text-transform: uppercase; font-weight: 900; letter-spacing: -0.05em;
+            color: transparent; -webkit-text-stroke: 2px rgba(255,255,255,0.8);
+            position: relative; z-index: 10; pointer-events: none;
+        }
+        .big-text.filled { color: white; -webkit-text-stroke: 0; mix-blend-mode: exclusion; }
+        .subtitle {
+            font-family: var(--font-display); font-size: 1rem; letter-spacing: 0.2em;
+            color: var(--c-blue); margin-bottom: 2rem; display: block;
+        }
+
+        /* --- 5. UI & NAV --- */
+        nav {
+            position: fixed; top: 0; left: 0; width: 100%; padding: 40px;
+            display: flex; justify-content: space-between; align-items: center; z-index: 100;
+            mix-blend-mode: difference;
+        }
+        .logo { font-family: var(--font-display); font-weight: 700; font-size: 1.5rem; letter-spacing: 2px; }
+        
+        .btn-glitch {
+            position: relative; padding: 15px 40px; background: transparent;
+            border: 1px solid rgba(255,255,255,0.3); color: white;
+            font-family: var(--font-display); font-size: 10px; letter-spacing: 2px;
+            text-transform: uppercase; overflow: hidden; transition: 0.3s;
+        }
+        .btn-glitch:hover { background: white; color: black; border-color: white; }
+        
+        .noise {
+            position: fixed; inset: 0; z-index: 9000; pointer-events: none; opacity: 0.07;
+            background: url('https://grainy-gradients.vercel.app/noise.svg');
+        }
+
+        /* --- 6. CHATBOT INTERFACE --- */
+        #chat-interface {
+            position: fixed; inset: 0; z-index: 10000;
+            background: rgba(2, 6, 23, 0.85); 
+            backdrop-filter: blur(30px); -webkit-backdrop-filter: blur(30px);
+            transform: translateY(100%); transition: transform 1s cubic-bezier(0.77, 0, 0.175, 1);
+            display: flex; flex-direction: column;
+        }
+        #chat-interface.active { transform: translateY(0); }
+        
+        .chat-glow {
+            position: absolute; width: 500px; height: 500px; background: var(--c-blue);
+            filter: blur(150px); opacity: 0.2; border-radius: 50%; top: -10%; left: -10%; z-index: -1;
+        }
+
+        .chat-header {
+            padding: 30px 50px; border-bottom: 1px solid rgba(255,255,255,0.1);
+            display: flex; justify-content: space-between; align-items: center;
+            background: rgba(0,0,0,0.2);
+        }
+        
+        .chat-body { flex-grow: 1; display: flex; overflow: hidden; position: relative; }
+        
+        .chat-sidebar {
+            width: 350px; border-right: 1px solid rgba(255,255,255,0.1); padding: 30px;
+            display: flex; flex-direction: column; background: rgba(0, 0, 0, 0.4);
+            transform: translateX(-100%); transition: transform 1s 0.2s cubic-bezier(0.19, 1, 0.22, 1);
+        }
+        #chat-interface.active .chat-sidebar { transform: translateX(0); }
+
+        .chat-main { flex-grow: 1; display: flex; flex-direction: column; position: relative; }
+        .messages-container {
+            flex-grow: 1; overflow-y: auto; padding: 50px 10%; display: flex; flex-direction: column; gap: 40px;
+        }
+        
+        .msg { opacity: 0; transform: translateY(20px); animation: fadeUp 0.5s forwards; display: flex; gap: 20px; }
+        @keyframes fadeUp { to { opacity: 1; transform: translateY(0); } }
+        
+        .msg-avatar {
+            width: 40px; height: 40px; border-radius: 12px;
+            display: flex; align-items: center; justify-content: center; font-size: 14px;
+            box-shadow: 0 0 15px rgba(0,0,0,0.5); flex-shrink: 0;
+        }
+        .msg-avatar.ai { background: linear-gradient(135deg, #00c6ff, #0072ff); color: white; }
+        .msg-avatar.user { background: #333; color: #fff; border: 1px solid #555; }
+
+        .msg-content { 
+            max-width: 800px; font-size: 1.1rem; line-height: 1.6; 
+            padding: 20px 25px; border-radius: 20px; position: relative;
+        }
+        
+        .msg.ai .msg-content {
+            background: rgba(255, 255, 255, 0.05); 
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            color: #e2e8f0; border-top-left-radius: 4px;
+        }
+        .msg.user { flex-direction: row-reverse; }
+        .msg.user .msg-content { 
+            background: linear-gradient(135deg, #3b82f6, #2563eb); 
+            color: white; border-top-right-radius: 4px;
+            box-shadow: 0 5px 20px rgba(37, 99, 235, 0.3);
+        }
+
+        .input-area {
+            padding: 40px 10%; border-top: 1px solid rgba(255,255,255,0.1);
+            display: flex; gap: 20px; align-items: flex-end; background: rgba(0,0,0,0.3);
+        }
+        #chat-input {
+            width: 100%; background: transparent; border: none; border-bottom: 2px solid rgba(255,255,255,0.2);
+            padding: 20px 0; color: white; font-family: var(--font-body); font-size: 1.2rem;
+            outline: none; transition: 0.3s;
+        }
+        #chat-input:focus { border-color: var(--c-cyan); }
+        .send-btn { color: var(--c-cyan); font-size: 2rem; cursor: pointer; transition: 0.3s; }
+        .send-btn:hover { color: white; transform: translateX(5px); }
+
+        /* --- 7. SPECIAL SECTIONS --- */
+        .marquee-container {
+            background: var(--c-blue); color: black; padding: 5vh 0;
+            transform: rotate(-2deg) scale(1.1); margin: 10vh 0;
+        }
+        .marquee-text {
+            font-family: var(--font-big); font-size: 5vw; white-space: nowrap; font-weight: 900;
+        }
+
+        .card-item {
+            position: relative; border-top: 1px solid rgba(255,255,255,0.2);
+            padding: 50px 0; transition: 0.3s; display: flex; justify-content: space-between; align-items: center;
+        }
+        .card-item:hover { padding-left: 20px; background: rgba(255,255,255,0.02); }
+        .card-item h3 { font-family: var(--font-display); font-size: 3rem; margin: 0; }
+        .card-item span { font-family: var(--font-body); color: var(--c-blue); }
+        
+        .hover-reveal {
+            position: fixed; width: 300px; height: 400px; top: 0; left: 0;
+            pointer-events: none; z-index: 50; opacity: 0; transform: scale(0.8);
+            transition: opacity 0.3s, transform 0.3s; mix-blend-mode: difference;
+        }
+        .hover-reveal img { width: 100%; height: 100%; object-fit: cover; }
+
+        /* --- 8. AUTH MODAL --- */
+        #auth-modal {
+            position: fixed; inset: 0; z-index: 11000;
+            display: flex; justify-content: center; align-items: center;
+            background: rgba(0,0,0,0.8); backdrop-filter: blur(10px);
+            opacity: 0; pointer-events: none; transition: opacity 0.5s;
+        }
+        #auth-modal.active { opacity: 1; pointer-events: auto; }
+        
+        .auth-box {
+            width: 400px; padding: 40px; border-radius: 20px;
+            background: rgba(2, 6, 23, 0.9); border: 1px solid rgba(255,255,255,0.1);
+            box-shadow: 0 0 50px rgba(59, 130, 246, 0.2);
+            text-align: center; transform: scale(0.9); transition: transform 0.5s;
+        }
+        #auth-modal.active .auth-box { transform: scale(1); }
+        
+        .auth-title { font-family: var(--font-display); font-size: 2rem; margin-bottom: 20px; color: white; }
+        
+        .auth-input {
+            width: 100%; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1);
+            padding: 15px; margin-bottom: 15px; color: white; border-radius: 8px; outline: none;
+            transition: 0.3s;
+        }
+        .auth-input:focus { border-color: var(--c-cyan); box-shadow: 0 0 10px rgba(6, 182, 212, 0.3); }
+        
+        .auth-btn {
+            width: 100%; padding: 15px; background: var(--c-blue); color: white; border: none;
+            font-family: var(--font-display); font-weight: bold; cursor: pointer;
+            transition: 0.3s; margin-top: 10px;
+        }
+        .auth-btn:hover { background: var(--c-cyan); letter-spacing: 2px; }
+        
+        .auth-switch { margin-top: 20px; font-size: 0.9rem; color: #888; }
+        .auth-switch span { color: var(--c-cyan); cursor: pointer; text-decoration: underline; }
+
+        /* --- 9. HISTORY LIST SCROLLBAR & ITEM --- */
+        .custom-scrollbar::-webkit-scrollbar { width: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #333; border-radius: 4px; }
+        
+        .conv-item { transition: 0.3s; cursor: pointer; position: relative; }
+        .conv-item:hover { background: rgba(255,255,255,0.05); }
+        .conv-item.active { background: rgba(6, 182, 212, 0.1); border-left: 3px solid var(--c-cyan); color: white; }
+        
+        /* ACTIONS: Hiển thị khi hover */
+        .conv-actions { display: none; position: absolute; right: 10px; top: 50%; transform: translateY(-50%); gap: 8px; }
+        .conv-item:hover .conv-actions { display: flex; }
+        .conv-action-btn { color: #888; transition: 0.2s; font-size: 12px; }
+        .conv-action-btn:hover { color: var(--c-cyan); }
+        .conv-action-btn.del:hover { color: #ff4444; }
+
+    </style>
+</head>
+<body>
+
+    <audio id="sfx-hover" src="https://assets.mixkit.co/active_storage/sfx/2571/2571-preview.m4a"></audio>
+    <audio id="sfx-open" src="https://assets.mixkit.co/active_storage/sfx/2044/2044-preview.m4a"></audio>
+
+    <div class="noise"></div>
+    <div id="cursor"></div> <div id="preloader">
+        <div class="loader-text">FIT SYSTEM</div>
+        <div style="width: 300px"><div class="loader-bar"></div></div>
+        <div class="loader-percent">0%</div>
+    </div>
+
+    <div id="webgl-canvas"></div>
+
+    <div id="auth-modal">
+        <div class="auth-box" id="login-form">
+            <h2 class="auth-title">ĐĂNG NHẬP</h2>
+            <input type="text" id="login-user" class="auth-input" placeholder="TÊN TÀI KHOẢN">
+            <input type="password" id="login-pass" class="auth-input" placeholder="MÂT KHẨU">
+            <button onclick="handleLogin()" class="auth-btn hover-trigger">ĐĂNG NHẬP</button>
+            <p class="auth-switch">Chưa có tài khoản? <span onclick="switchAuth('register')" class="hover-trigger">Tạo tài khoản mới</span></p>
+            <p id="login-msg" class="text-red-500 text-xs mt-2"></p>
+        </div>
+
+        <div class="auth-box" id="register-form" style="display: none;">
+            <h2 class="auth-title">TÀI KHOẢN MỚI</h2>
+            <input type="text" id="reg-user" class="auth-input" placeholder="TÊN TÀI KHOẢN">
+            <input type="password" id="reg-pass" class="auth-input" placeholder="MÂT KHẨU">
+            <button onclick="handleRegister()" class="auth-btn hover-trigger">ĐĂNG KÍ</button>
+            <p class="auth-switch">Người dùng đã tồn tại? <span onclick="switchAuth('login')" class="hover-trigger">Đăng nhập</span></p>
+            <p id="reg-msg" class="text-red-500 text-xs mt-2"></p>
+        </div>
+    </div>
+
+    <div id="chat-interface">
+        <div class="chat-glow"></div> <div class="chat-header">
+            <div class="flex items-center gap-4">
+                <div class="w-3 h-3 bg-cyan-400 rounded-full animate-pulse shadow-[0_0_10px_#22d3ee]"></div>
+                <span class="font-bold tracking-widest text-sm text-cyan-400">FIT.AI <span class="text-white opacity-50">v2.0</span></span>
+            </div>
+            <button onclick="toggleChat()" class="btn-glitch hover-trigger">ĐÓNG CỬA SỔ</button>
+        </div>
+
+        <div class="chat-body">
+            <div class="chat-sidebar">
+                <div class="flex flex-col h-full">
+                    <button onclick="createNewChat()" class="mb-4 w-full py-3 border border-cyan-500 text-cyan-400 rounded hover:bg-cyan-500 hover:text-black transition font-bold flex items-center justify-center gap-2 hover-trigger">
+                        <i class="fa-solid fa-plus"></i> CUỘC TRÒ CHUYỆN MỚI
+                    </button>
+
+                    <p class="text-blue-400 text-xs font-bold mb-2 mt-2 tracking-widest uppercase">Lịch sử</p>
+                    <div class="flex-grow overflow-y-auto pr-2 custom-scrollbar" id="conversation-list">
+                        </div>
+
+                    <div class="mt-auto">
+                        <div class="w-full h-[1px] bg-white/10 mb-4 mt-4"></div>
+                        <div class="flex justify-between items-center mb-2">
+                            <span id="current-username" class="text-cyan-400 font-bold">User</span>
+                            <button onclick="handleLogout()" class="text-xs text-red-500 hover:text-white hover-trigger">ĐĂNG XUẤT [X]</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="chat-main">
+                <div id="chat-history" class="messages-container">
+                    <div class="text-center text-gray-500 mt-20">
+                        <h2 class="text-2xl font-bold mb-2">FIT HCMUS AI</h2>
+                        <p>Bấm "Cuộc trò chuyện mới" để bắt đầu.</p>
+                    </div>
+                </div>
+                <div class="input-area">
+                    <textarea id="chat-input" rows="1" placeholder="Type your command..." class="hover-trigger"></textarea>
+                    <button id="btn-send" class="send-btn hover-trigger"><i class="fa-solid fa-paper-plane"></i></button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <nav>
+        <div class="logo hover-trigger">FIT<span class="text-blue-600">.</span>HCMUS</div>
+        <div class="hidden md:flex gap-12 text-xs font-bold tracking-widest">
+            <a href="#majors" class="hover-trigger">CHƯƠNG TRÌNH ĐÀO TẠO</a>
+            <a href="#stats" class="hover-trigger">SỐ LIỆU</a>
+            <a href="#footer" class="hover-trigger">LIÊN HỆ</a>
+        </div>
+        <button onclick="toggleChat()" class="btn-glitch hover-trigger">KHỞI ĐỘNG CHATBOT</button>
+    </nav>
+
+    <main id="main-content">
+        
+        <section class="hero-section">
+            <div class="relative z-10 text-center">
+                <span class="subtitle">TUYỂN SINH 2025 - 2026</span>
+                <h1 class="big-text skew-on-scroll">FIT</h1>
+                <h1 class="big-text filled skew-on-scroll">HCMUS</h1>
+                <p class="mt-10 text-gray-400 max-w-lg mx-auto leading-relaxed">
+                    Khoa Công nghệ Thông tin - ĐH Khoa học Tự nhiên. <br>
+                    Nơi hội tụ những bộ óc kiến tạo tương lai. <br>
+                    Hỗ trỡ sinh viên với ChatbotAI tự động.
+                </p>
+            </div>
+        </section>
+
+        <div class="marquee-container">
+            <div class="marquee-inner flex gap-10">
+                <span class="marquee-text">KHOA HỌC MÁY TÍNH — TRÍ TUỆ NHÂN TẠO — CÔNG NGHỆ THÔNG TIN — MÁY TÍNH VÀ CNTT — </span>
+                <span class="marquee-text">KHOA HỌC MÁY TÍNH — TRÍ TUỆ NHÂN TẠO — CÔNG NGHỆ THÔNG TIN — MÁY TÍNH VÀ CNTT — </span>
+            </div>
+        </div>
+
+        <section id="majors" class="section">
+            <div class="flex justify-between items-end mb-20">
+                <h2 class="text-6xl font-bold font-display">VŨ TRỤ<br>HỌC THUẬT</h2>
+                <p class="text-right text-gray-500">Khám phá các chương trình <br>đào tạo chuẩn quốc tế.</p>
+            </div>
+
+            <div class="border-b border-white/20">
+                <div class="card-item hover-trigger" data-img="https://images.unsplash.com/photo-1518770660439-4636190af475?q=80&w=2070">
+                    <div>
+                        <span class="block text-xs text-blue-600 mb-2 font-mono">01 / NGÀNH</span>
+                        <h3>Khoa học máy tính</h3>
+                    </div>
+                    <div class="text-right">
+                        <span class="block text-xl">Khoa học máy tính</span>
+                        <button onclick="exploreMajor('Khoa học máy tính')" class="text-xs mt-2 underline">HỎI CHATBOT ></button>
+                    </div>
+                </div>
+
+                <div class="card-item hover-trigger" data-img="https://images.unsplash.com/photo-1677442136019-21780ecad995?q=80&w=2070">
+                    <div>
+                        <span class="block text-xs text-green-500 mb-2 font-mono">02 / NGÀNH</span>
+                        <h3>Trí tuệ nhân tạo</h3>
+                    </div>
+                    <div class="text-right">
+                        <span class="block text-xl">Trí tuệ nhân tạo</span>
+                        <button onclick="exploreMajor('Trí tuệ nhân tạo')" class="text-xs mt-2 underline">HỎI CHATBOT ></button>
+                    </div>
+                </div>
+
+                <div class="card-item hover-trigger" data-img="https://images.unsplash.com/photo-1451187580459-43490279c0fa?q=80&w=2072">
+                    <div>
+                        <span class="block text-xs text-blue-600 mb-2 font-mono">03 / NGÀNH</span>
+                        <h3>Công nghệ thông tin</h3>
+                    </div>
+                    <div class="text-right">
+                        <span class="block text-xl">Công nghệ thông tin</span>
+                        <button onclick="exploreMajor('Công nghệ thông tin')" class="text-xs mt-2 underline">HỎI CHATBOT ></button>
+                    </div>
+                </div>
+
+                <div class="card-item hover-trigger" data-img="https://images.unsplash.com/photo-1519389950473-47ba0277781c?q=80&w=2070">
+                    <div>
+                        <span class="block text-xs text-purple-500 mb-2 font-mono">04 / NHÓM NGÀNH</span>
+                        <h3>Máy tính và CNTT</h3>
+                    </div>
+                    <div class="text-right">
+                        <span class="block text-xl">Máy tính và CNTT</span>
+                        <button onclick="exploreMajor('Nhóm ngành Máy tính và Công nghệ thông tin')" class="text-xs mt-2 underline">HỎI CHATBOT ></button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <div class="hover-reveal"><img src="" id="reveal-img"></div>
+
+        <section id="stats" class="section" style="padding: 20vh 5vw;">
+            <div class="w-full border-t border-white/20 mb-10"></div>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-20">
+                <div>
+                    <h2 class="text-5xl font-bold mb-10">#1 DIỄN ĐÀN CÔNG NGHỆ <br> TẠI MIỀN NAM</h2>
+                    <p class="text-gray-400 text-lg leading-relaxed mb-10">
+                        Với mạng lưới hơn 50 đối tác toàn cầu, FIT HCMUS mang đến cơ hội thực tập và làm việc tại các tập đoàn công nghệ hàng đầu như Google, Microsoft, VNG...
+                    </p>
+                    <div class="grid grid-cols-2 gap-10">
+                        <div>
+                            <span class="text-4xl font-bold text-blue-500 block mb-2 counter" data-target="98%">0</span>
+                            <span class="text-xs uppercase tracking-widest text-gray-500">Tỉ lệ có việc làm</span>
+                        </div>
+                        <div>
+                            <span class="text-4xl font-bold text-blue-500 block mb-2 counter" data-target="50">0</span>
+                            <span class="text-xs uppercase tracking-widest text-gray-500">Đối tác toàn cầu</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="relative h-[600px] w-full overflow-hidden rounded-lg hover-trigger">
+                    <img src="https://hcmus.edu.vn/wp-content/uploads/slider/cache/fae88e4b6d9af954c9e28e1f58335483/FB-COVER-scaled.jpg" class="w-full h-full object-cover grayscale hover:grayscale-0 transition duration-700">
+                </div>
+            </div>
+        </section>
+
+        <section id="footer" class="h-screen flex flex-col justify-center items-center text-center relative">
+            <span class="subtitle">END OF LINE</span>
+            <h2 class="big-text filled cursor-pointer hover-trigger" onclick="toggleChat()">THAM GIA NGAY</h2>
+            <div class="mt-10">
+                <button onclick="toggleChat()" class="btn-glitch hover-trigger" style="font-size: 1.5rem; padding: 25px 60px;">KHỞI ĐỘNG CHATBOT</button>
+            </div>
+            
+            <footer class="absolute bottom-10 w-full flex justify-between px-10 text-xs text-gray-600 font-bold tracking-widest uppercase">
+                <div>Thiết kế bởi Bộ PC & AI</div>
+            </footer>
+        </section>
+
+    </main>
+
+    <script>
+        // --- 1. AUDIO SYSTEM ---
+        const sfx = {
+            hover: document.getElementById('sfx-hover'),
+            open: document.getElementById('sfx-open')
+        };
+        const API_BASE_URL = "https://fitaibybopcteam.onrender.com";
+        sfx.hover.volume = 0.2;
+
+        document.querySelectorAll('.hover-trigger').forEach(el => {
+            el.addEventListener('mouseenter', () => { sfx.hover.currentTime = 0; sfx.hover.play().catch(()=>{}); document.body.classList.add('hovering'); });
+            el.addEventListener('mouseleave', () => document.body.classList.remove('hovering'));
+        });
+
+        // --- 2. CUSTOM CURSOR (INSTANT SPEED) ---
+        const cursor = document.getElementById('cursor');
+        window.addEventListener('mousemove', (e) => {
+            gsap.set(cursor, { x: e.clientX, y: e.clientY });
+            const reveal = document.querySelector('.hover-reveal');
+            const target = e.target.closest('.card-item');
+            if(target) {
+                const img = target.dataset.img;
+                document.getElementById('reveal-img').src = img;
+                gsap.to(reveal, { opacity: 1, scale: 1, x: e.clientX + 20, y: e.clientY + 20, duration: 0.3 });
+            } else {
+                gsap.to(reveal, { opacity: 0, scale: 0.8, duration: 0.3 });
+            }
+        });
+
+        // --- 3. PRELOADER ---
+        let loadProg = 0; const bar = document.querySelector('.loader-bar'); const txt = document.querySelector('.loader-percent');
+        const loadInt = setInterval(() => {
+            loadProg += Math.random() * 5; if(loadProg > 100) loadProg = 100;
+            bar.style.width = loadProg + '%'; txt.innerText = Math.floor(loadProg) + '%';
+            if(loadProg === 100) { clearInterval(loadInt); gsap.to('#preloader', { yPercent: -100, duration: 1.5, ease: 'expo.inOut', delay: 0.5 }); initThreeJS(); document.body.classList.add('loaded'); }
+        }, 20);
+
+        // --- 4. THREE JS ---
+        function initThreeJS() {
+            const container = document.getElementById('webgl-canvas');
+            const scene = new THREE.Scene(); scene.fog = new THREE.FogExp2(0x000000, 0.002);
+            const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000); camera.position.z = 100;
+            const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight); renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2)); container.appendChild(renderer.domElement);
+            
+            const geometry = new THREE.BufferGeometry(); const count = 5000; const positions = new Float32Array(count * 3); const speeds = new Float32Array(count);
+            for(let i = 0; i < count; i++) {
+                positions[i*3] = (Math.random() - 0.5) * 2000; positions[i*3+1] = (Math.random() - 0.5) * 2000; positions[i*3+2] = (Math.random() - 0.5) * 2000; speeds[i] = Math.random();
+            }
+            geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+            const material = new THREE.PointsMaterial({ color: 0x3b82f6, size: 2, sizeAttenuation: true });
+            const points = new THREE.Points(geometry, material); scene.add(points);
+            
+            const composer = new THREE.EffectComposer(renderer);
+            composer.addPass(new THREE.RenderPass(scene, camera));
+            composer.addPass(new THREE.UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 1.5, 0.4, 0.85));
+            
+            function animate() {
+                requestAnimationFrame(animate);
+                const p = geometry.attributes.position.array;
+                for(let i = 0; i < count; i++) {
+                    p[i*3+2] += (2 * speeds[i]) * (1 + Math.abs(lenis.velocity||0)*0.1);
+                    if(p[i*3+2] > 200) p[i*3+2] = -2000;
+                }
+                geometry.attributes.position.needsUpdate = true;
+                points.rotation.z += 0.001;
+                composer.render();
+            }
+            animate();
+            window.addEventListener('resize', () => { camera.aspect = window.innerWidth / window.innerHeight; camera.updateProjectionMatrix(); renderer.setSize(window.innerWidth, window.innerHeight); composer.setSize(window.innerWidth, window.innerHeight); });
+        }
+
+        // --- 5. SMOOTH SCROLL ---
+        const lenis = new Lenis({ duration: 1.5, smooth: true });
+        function raf(time) { lenis.raf(time); requestAnimationFrame(raf); } requestAnimationFrame(raf);
+        gsap.registerPlugin(ScrollTrigger);
+        gsap.to(".marquee-inner", { xPercent: -50, ease: "none", scrollTrigger: { trigger: ".marquee-container", start: "top bottom", end: "bottom top", scrub: 0.5 } });
+        lenis.on('scroll', (e) => { gsap.to('.skew-on-scroll', { skewY: e.velocity * 0.1, duration: 0.5 }); });
+        gsap.utils.toArray('.counter').forEach(c => {
+            let t = c.getAttribute('data-target'); let s = t.includes('%') ? '%' : '+'; t = parseInt(t);
+            gsap.to(c, { innerText: t, duration: 2, snap: { innerText: 1 }, scrollTrigger: { trigger: c, start: "top 80%" }, onUpdate: function() { c.innerText = Math.ceil(this.targets()[0].innerText) + s } });
+        });
+
+        // --- 6. CHATBOT LOGIC ---
+        const chatUI = document.getElementById('chat-interface');
+        const userInput = document.getElementById('chat-input');
+        const chatHistory = document.getElementById('chat-history');
+        const authModal = document.getElementById('auth-modal');
+        let chatOpen = false, isUserLoggedIn = false, currentConvId = null;
+
+        async function checkAuthStatus() {
+            try {
+                const res = await fetch(`${API_BASE_URL}/api/check_auth`);
+                const data = await res.json();
+                isUserLoggedIn = data.is_logged_in;
+                if(isUserLoggedIn) { document.getElementById('current-username').innerText = data.username; loadConversationList(); }
+            } catch(e){}
+        }
+        checkAuthStatus();
+
+        function toggleChat() {
+            if(!chatOpen) {
+                if(!isUserLoggedIn) { authModal.classList.add('active'); sfx.open.play().catch(()=>{}); return; }
+                chatUI.classList.add('active'); lenis.stop(); sfx.open.play().catch(()=>{});
+                setTimeout(() => userInput.focus(), 800); chatOpen = true;
+            } else {
+                chatUI.classList.remove('active'); lenis.start(); chatOpen = false;
+            }
+        }
+
+        // --- API & LOGIC ---
+        async function loadConversationList() {
+            try {
+                const res = await fetch(`${API_BASE_URL}/api/conversations`);
+                if(!res.ok) return;
+                const convs = await res.json();
+                const list = document.getElementById('conversation-list');
+                list.innerHTML = '';
+                convs.forEach(c => {
+                    const active = c.id === currentConvId ? 'active' : '';
+                    const item = `
+                        <div class="conv-item ${active} p-3 mb-2 rounded cursor-pointer text-sm text-gray-300 truncate border border-transparent group relative">
+                            <div onclick="loadConversationContent(${c.id})" class="truncate pr-12">
+                                <i class="fa-regular fa-message mr-2 text-cyan-500"></i> <span id="title-${c.id}">${c.title}</span>
+                            </div>
+                            <div class="conv-actions">
+                                <button onclick="renameConversation(${c.id})" class="conv-action-btn" title="Đổi tên"><i class="fa-solid fa-pen"></i></button>
+                                <button onclick="deleteConversation(${c.id})" class="conv-action-btn del" title="Xóa"><i class="fa-solid fa-trash"></i></button>
+                            </div>
+                        </div>`;
+                    list.insertAdjacentHTML('beforeend', item);
+                });
+            } catch(e) { console.error(e); }
+        }
+
+        async function loadConversationContent(id) {
+            currentConvId = id; loadConversationList();
+            const res = await fetch(`${API_BASE_URL}/api/conversation/${id}`);
+            const msgs = await res.json();
+            const container = document.getElementById('chat-history');
+            container.innerHTML = '';
+            if(msgs.length === 0) container.innerHTML = `<div class="text-center text-gray-500 mt-20"><h2 class="text-2xl font-bold mb-2">CHAT MỚI</h2></div>`;
+            msgs.forEach(m => renderMessage(m.role, m.content));
+            container.scrollTop = container.scrollHeight;
+        }
+
+        async function createNewChat() {
+            const res = await fetch(`${API_BASE_URL}/api/conversation/new`, {method:'POST'});
+            const data = await res.json();
+            if(data.success) {
+                currentConvId = data.id;
+                document.getElementById('chat-history').innerHTML = `<div class="text-center text-gray-500 mt-20"><h2 class="text-2xl font-bold mb-2">CUỘC TRÒ CHUYỆN MỚI</h2></div>`;
+                loadConversationList();
+            }
+            return data;
+        }
+
+        async function deleteConversation(id) {
+            if(!confirm("Xóa cuộc trò chuyện này?")) return;
+            try {
+                const res = await fetch(`${API_BASE_URL}/api/conversation/delete/${id}`, {method:'DELETE'});
+                if(res.ok) {
+                    if(currentConvId === id) { currentConvId = null; document.getElementById('chat-history').innerHTML = ''; }
+                    loadConversationList();
+                }
+            } catch(e) { alert("Lỗi: " + e); }
+        }
+
+        async function renameConversation(id) {
+            const oldName = document.getElementById(`title-${id}`).innerText;
+            const newName = prompt("Tên mới:", oldName);
+            if(newName && newName.trim()) {
+                await fetch(`/api/conversation/rename/${id}`, { method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify({title: newName}) });
+                loadConversationList();
+            }
+        }
+
+        function renderMessage(role, txt) {
+            const container = document.getElementById('chat-history');
+            const isUser = role==='user';
+            const html = `
+                <div class="msg ${isUser?'user':'ai'}" style="opacity:1; transform:translateY(0)">
+                    ${!isUser ? '<div class="msg-avatar ai"><i class="fa-solid fa-robot"></i></div>' : ''}
+                    <div class="msg-content">${txt}</div>
+                    ${isUser ? '<div class="msg-avatar user"><i class="fa-solid fa-user"></i></div>' : ''}
+                </div>`;
+            container.insertAdjacentHTML('beforeend', html);
+            container.scrollTop = container.scrollHeight;
+        }
+
+        async function sendMessage() {
+            const txt = userInput.value.trim();
+            if(!txt) return;
+            if(!currentConvId) { const d = await createNewChat(); if(d.success) currentConvId = d.id; }
+            
+            renderMessage('user', txt); userInput.value='';
+            const loadId = 'l-'+Date.now();
+            document.getElementById('chat-history').insertAdjacentHTML('beforeend', `<div class="msg ai" id="${loadId}"><div class="msg-avatar ai"><i class="fa-solid fa-circle-notch fa-spin"></i></div><div class="msg-content text-gray-500">Processing...</div></div>`);
+            
+            try {
+                const res = await fetch(`${API_BASE_URL}/api/chat`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({message:txt, conversation_id:currentConvId}) });
+                document.getElementById(loadId).remove();
+                if(res.status===401) { alert("Hết phiên đăng nhập"); location.reload(); return; }
+                const data = await res.json();
+                renderMessage('ai', data.response);
+                if(data.new_title) loadConversationList();
+            } catch(e) { console.error(e); }
+        }
+
+        // --- AUTH ---
+        function switchAuth(t) {
+            document.getElementById('login-form').style.display = t==='register'?'none':'block';
+            document.getElementById('register-form').style.display = t==='register'?'block':'none';
+        }
+        async function handleLogin() {
+            const u=document.getElementById('login-user').value, p=document.getElementById('login-pass').value;
+            const res = await fetch(`${API_BASE_URL}/api/login`, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({username:u, password:p})});
+            const d = await res.json();
+            if(d.success) { isUserLoggedIn=true; authModal.classList.remove('active'); document.getElementById('current-username').innerText=u; loadConversationList(); toggleChat(); }
+            else document.getElementById('login-msg').innerText = d.message;
+        }
+        async function handleRegister() {
+            const u=document.getElementById('reg-user').value, p=document.getElementById('reg-pass').value;
+            const res = await fetch(`${API_BASE_URL}/api/register`, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({username:u, password:p})});
+            const d = await res.json();
+            if(d.success) { alert("OK"); switchAuth('login'); } else document.getElementById('reg-msg').innerText = d.message;
+        }
+        async function handleLogout() { await fetch(`${API_BASE_URL}/api/logout`, {method:'POST'}); location.reload(); }
+        
+        function exploreMajor(n) {
+            if(!isUserLoggedIn) { authModal.classList.add('active'); return; }
+            if(!chatOpen) toggleChat();
+            createNewChat().then(()=>{ setTimeout(()=>{ userInput.value=`Tôi muốn tìm hiểu về điểm chuẩn, học phí, chương trình đào tạo ngành "${n}"thuộc Khoa Công nghệ thông tin của Trường Đại học Khoa học tự nhiên, ĐHQG-HCM.`; sendMessage(); }, 300) });
+        }
+        function sendQuick(t) { userInput.value=t; sendMessage(); }
+
+        document.getElementById('btn-send').onclick = sendMessage;
+        userInput.onkeydown = (e) => { if(e.key==='Enter' && !e.shiftKey) {e.preventDefault(); sendMessage();} }
+    </script>
+</body>
+</html>
