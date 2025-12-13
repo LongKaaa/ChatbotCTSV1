@@ -677,7 +677,7 @@
             document.getElementById('chat-history').insertAdjacentHTML('beforeend', `<div class="msg ai" id="${loadId}"><div class="msg-avatar ai"><i class="fa-solid fa-circle-notch fa-spin"></i></div><div class="msg-content text-gray-500">Processing...</div></div>`);
             
             try {
-                const res = await fetch(`${API_BASE_URL}/api/chat`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({message:txt, conversation_id:currentConvId}) });
+                const res = await fetch(`${API_BASE_URL}/api/chat`, { method:'POST', headers:{'Content-Type':'application/json'},credentials: 'include', body: JSON.stringify({message:txt, conversation_id:currentConvId}) });
                 document.getElementById(loadId).remove();
                 if(res.status===401) { alert("Hết phiên đăng nhập"); location.reload(); return; }
                 const data = await res.json();
