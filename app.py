@@ -260,7 +260,7 @@ class ChatMessage(db.Model):
 
 @app.route('/')
 def home():
-    return render_template('index.html')
+    return "Backend is running"
 
 # AUTHENTICATION APIs
 @app.route('/api/register', methods=['POST'])
