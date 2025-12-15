@@ -555,15 +555,30 @@
         let chatOpen = false, isUserLoggedIn = false, currentConvId = null;
 
         async function checkAuthStatus() {
+            // 1. Đặt hẹn giờ: Nếu quá 3 giây chưa thấy phản hồi thì báo khách biết
+            const serverWakeUpTimer = setTimeout(() => {
+                showToast("Server đang khởi động (có thể mất 30-50s)... Vui lòng đợi!", "info");
+            }, 3000);
+
             try {
-                // Thêm ?t=... để đảm bảo mỗi lần gọi là một URL khác nhau -> Không bị cache
+                // Thêm ?t=... để chống cache
                 const res = await fetch(`${API_BASE_URL}/api/check_auth?t=${Date.now()}`, {
                     credentials: 'include'
                 });
+
+                // 2. Nếu server trả lời, hủy ngay cái hẹn giờ ở trên (để không hiện thông báo nếu mạng nhanh)
+                clearTimeout(serverWakeUpTimer);
+
                 const data = await res.json();
                 isUserLoggedIn = data.is_logged_in;
+
                 if(isUserLoggedIn) { 
                     document.getElementById('current-username').innerText = data.username; 
+                    const progressToast = document.querySelector('.bg-blue-500'); 
+                    if(progressToast) {
+                        showToast("Kết nối thành công! Chào mừng trở lại.", "success");
+                    }
+                    
                     loadConversationList(); 
                 } else {
                     // Nếu chưa đăng nhập thì đảm bảo UI sạch sẽ
@@ -571,7 +586,10 @@
                     document.getElementById('conversation-list').innerHTML = "";
                     currentConvId = null;
                 }
-            } catch(e){}
+            } catch(e){
+                clearTimeout(serverWakeUpTimer); // Hủy hẹn giờ nếu lỗi mạng hẳn
+                console.error(e);
+            }
         }
         checkAuthStatus();
 
@@ -725,7 +743,7 @@
                 body:JSON.stringify({username:u, password:p})
             });
             const d = await res.json();
-            if(d.success) { alert("OK"); switchAuth('login'); } else document.getElementById('reg-msg').innerText = d.message;
+            if(d.success) { alert("Đăng Kí Thành Công"); switchAuth('login'); } else document.getElementById('reg-msg').innerText = d.message;
         }
         async function handleLogout() { 
             try {
