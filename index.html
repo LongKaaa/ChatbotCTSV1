@@ -169,7 +169,31 @@
             max-width: 800px; font-size: 1.1rem; line-height: 1.6; 
             padding: 20px 25px; border-radius: 20px; position: relative;
         }
+        /* --- FIX HIỂN THỊ DANH SÁCH (BULLET POINTS) --- */
+        .msg-content ul, .msg-content ol {
+            margin-top: 10px;
+            margin-bottom: 10px;
+            padding-left: 25px !important; /* Thụt đầu dòng */
+        }
         
+        .msg-content ul {
+            list-style-type: disc !important; /* Dấu chấm tròn */
+        }
+
+        .msg-content ol {
+            list-style-type: decimal !important; /* Số 1. 2. 3. */
+        }
+
+        .msg-content li {
+            margin-bottom: 5px;
+            line-height: 1.6;
+        }
+
+        /* Tô màu đậm cho các thẻ in đậm để dễ nhìn hơn */
+        .msg-content strong, .msg-content b {
+            color: var(--c-cyan);
+            font-weight: 700;
+        }
         .msg.ai .msg-content {
             background: rgba(255, 255, 255, 0.05); 
             border: 1px solid rgba(255, 255, 255, 0.1);
@@ -369,7 +393,7 @@
                     </div>
                 </div>
                 <div class="input-area">
-                    <textarea id="chat-input" rows="1" placeholder="Type your command..." class="hover-trigger"></textarea>
+                    <textarea id="chat-input" rows="1" placeholder="Nhập yêu cầu của bạn tại đây..." class="hover-trigger"></textarea>
                     <button id="btn-send" class="send-btn hover-trigger"><i class="fa-solid fa-paper-plane"></i></button>
                 </div>
             </div>
