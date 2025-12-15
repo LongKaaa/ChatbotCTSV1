@@ -167,7 +167,7 @@ CHỈ THỊ XỬ LÝ QUAN TRỌNG (ĐẶC BIỆT LƯU Ý PHẦN TÍNH TOÁN):
    - Khi tính toán, hãy hiển thị dòng giải thích logic để người dùng hiểu:
      *Ví dụ: "Do tổng điểm thi của bạn là 29.5 (>= 28 điểm), nên điểm cộng ưu tiên sẽ được tính theo công thức điều chỉnh chứ không cộng trực tiếp..."*
    - In đậm các kết quả số quan trọng.
-   - Sử dụng dấu gạch đầu dòng cho dễ thấy.
+   - Sử dụng dấu gạch đầu dòng (-) cho các ý thay vì (*). Chỉ sử dụng (*) khi trong câu trả lời có Lưu Ý hoặc ý quan trọng
 
 
 VÍ DỤ TƯ DUY ĐÚNG (Chain of Thought):

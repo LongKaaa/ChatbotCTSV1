@@ -269,7 +269,32 @@
         .conv-action-btn { color: #888; transition: 0.2s; font-size: 12px; }
         .conv-action-btn:hover { color: var(--c-cyan); }
         .conv-action-btn.del:hover { color: #ff4444; }
+    /* --- FIX HIỂN THỊ CHUỘT (MOUSE FIX) --- */
 
+        /* 1. Khi vào ô nhập liệu (Input/Textarea), bắt buộc hiện lại con trỏ văn bản (I-beam) */
+        input, textarea, select {
+            cursor: text !important;
+        }
+
+        /* 2. Khi vào nút bấm hoặc link, hiện lại bàn tay (Pointer) để người dùng biết là bấm được */
+        button, a, .conv-item, .auth-switch span {
+            cursor: pointer !important;
+        }
+
+        /* 3. LOGIC QUAN TRỌNG: (Sử dụng CSS hiện đại :has)
+           Khi người dùng đang di chuột vào Input, Button hoặc Link...
+           ...thì lập tức ẨN con chuột Custom (#cursor) đi.
+        */
+        body:has(input:hover) #cursor,
+        body:has(textarea:hover) #cursor,
+        body:has(select:hover) #cursor,
+        body:has(button:hover) #cursor,
+        body:has(a:hover) #cursor,
+        body:has(.conv-item:hover) #cursor,
+        body:has(.auth-switch span:hover) #cursor {
+            opacity: 0 !important; /* Ẩn chuột custom */
+            transform: translate(-50%, -50%) scale(0) !important; /* Thu nhỏ về 0 cho mượt */
+        }
     </style>
 </head>
 <body>
@@ -301,7 +326,7 @@
             <input type="text" id="reg-user" class="auth-input" placeholder="TÊN TÀI KHOẢN">
             <input type="password" id="reg-pass" class="auth-input" placeholder="MÂT KHẨU">
             <button onclick="handleRegister()" class="auth-btn hover-trigger">ĐĂNG KÍ</button>
-            <p class="auth-switch">Người dùng đã tồn tại? <span onclick="switchAuth('login')" class="hover-trigger">Đăng nhập</span></p>
+            <p class="auth-switch">Đã có tài khoản? <span onclick="switchAuth('login')" class="hover-trigger">Đăng nhập</span></p>
             <p id="reg-msg" class="text-red-500 text-xs mt-2"></p>
         </div>
     </div>
