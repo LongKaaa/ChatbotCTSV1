@@ -24,22 +24,7 @@ CORS(app, resources={r"/api/*": {
 # CẤU HÌNH COOKIE ĐỂ CHẠY ĐƯỢC TRÊN HTTPS (RENDER)
 app.config['SESSION_COOKIE_SAMESITE'] = 'None'
 app.config['SESSION_COOKIE_SECURE'] = True
-@app.route('/api/history', methods=['GET'])
-@login_required
-def get_history():
-    # Lấy toàn bộ tin nhắn của user hiện tại, sắp xếp theo thời gian
-    messages = ChatMessage.query.filter_by(user_id=current_user.id).order_by(ChatMessage.timestamp).all()
-    
-    history_data = []
-    for msg in messages:
-        history_data.append({
-            "role": msg.role,
-            "content": msg.content,
-            # Chỉ lấy 30 ký tự đầu làm tiêu đề cho sidebar nếu là tin nhắn user
-            "preview": msg.content[:30] + "..." if len(msg.content) > 30 else msg.content
-        })
-    
-    return jsonify(history_data)
+
 
 # --- 1. CẤU HÌNH DATABASE ---
 database_url = os.environ.get("DATABASE_URL")
@@ -228,10 +213,7 @@ VÍ DỤ TƯ DUY ĐÚNG (Chain of Thought):
     - Phải luôn trả lời câu hỏi thông tin một cách tự nhiên. Đặc biệt các câu hỏi như điểm chuẩn thì phải giữ định dạng trả lời tự nhiên, không nên copy y hệt nội dung từ PDF (TẤT NHIÊN ĐIỂM SỐ VÀ THÔNG TIN PHẢI TUYỆT ĐỐI CHÍNH XÁC, KHÔNG ĐƯỢC NHẦM LẪN, KHÔNG ĐƯỢC HALLUCINATE)
 """
 
-chat_session = model.start_chat(history=[
-    {"role": "user", "parts": [context_instruction]},
-    {"role": "model", "parts": ["Dạ, mình đã hiểu. FIT-Bot sẵn sàng hỗ trợ."]}
-])
+
 
 # --- 3. MODELS (CẬP NHẬT CẤU TRÚC MỚI) ---
 
@@ -368,7 +350,7 @@ def chat():
 
     if not user_question: return jsonify({"response": "Rỗng"})
 
-    # ... (giữ nguyên phần xử lý conversation_id) ...
+    # 1. Xử lý Conversation ID
     if not conv_id:
         new_conv = Conversation(user_id=current_user.id, title=user_question[:30])
         db.session.add(new_conv)
@@ -376,16 +358,43 @@ def chat():
         conv_id = new_conv.id
     else:
         conv = Conversation.query.get(conv_id)
-        if conv and conv.title == "Cuộc trò chuyện mới":
+        # BẢO MẬT: Kiểm tra quyền sở hữu
+        if not conv or conv.user_id != current_user.id:
+             return jsonify({"response": "Lỗi: Không tìm thấy cuộc hội thoại"}), 403
+        
+        # Cập nhật tiêu đề nếu cần
+        if conv.title == "Cuộc trò chuyện mới":
             conv.title = user_question[:40] + "..." if len(user_question) > 40 else user_question
             db.session.commit()
 
     try:
+        # 2. TÁI TẠO LỊCH SỬ CHAT (QUAN TRỌNG ĐỂ RIÊNG TƯ)
+        # Lấy tin nhắn cũ từ DB
+        old_messages = ChatMessage.query.filter_by(conversation_id=conv_id).order_by(ChatMessage.timestamp).all()
+        
+        # Tạo history chuẩn format Gemini
+        gemini_history = [
+            {"role": "user", "parts": [context_instruction]},
+            {"role": "model", "parts": ["Dạ, mình đã hiểu. FIT-Bot sẵn sàng hỗ trợ."]}
+        ]
+        
+        for msg in old_messages:
+            role = "user" if msg.role == "user" else "model"
+            gemini_history.append({"role": role, "parts": [msg.content]})
+
+        # Khởi tạo session MỚI (Local variable)
+        chat_session = model.start_chat(history=gemini_history)
+
+        # 3. Gửi tin nhắn mới
         response = chat_session.send_message(user_question)
+        
+        # Format câu trả lời
         bot_reply = markdown.markdown(
             response.text, 
             extensions=['extra', 'nl2br', 'sane_lists']
         )
+        
+        # 4. Lưu vào Database
         user_msg = ChatMessage(content=user_question, role='user', conversation_id=conv_id)
         bot_msg = ChatMessage(content=bot_reply, role='bot', conversation_id=conv_id)
         db.session.add_all([user_msg, bot_msg])
@@ -394,12 +403,12 @@ def chat():
         return jsonify({
             "response": bot_reply,
             "conversation_id": conv_id,
-            "new_title": conv.title 
+            "new_title": conv.title if conv else None
         })
 
     except Exception as e:
-        print(f"Lỗi chat: {e}")
-        return jsonify({"response": "Hệ thống đang bận, vui lòng thử lại sau."})
+        print(f"Lỗi Chat: {e}")
+        return jsonify({"response": "Hệ thống đang quá tải, vui lòng thử lại sau."})
 
 
 # --- 5. CHẠY ỨNG DỤNG ---

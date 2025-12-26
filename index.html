@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>FIT @ HCMUS | THE SINGULARITY</title>
+    <title>Chatbot Tư vấn tuyển sinh fit@hcmus</title>
     
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
@@ -754,7 +754,7 @@
             
             renderMessage('user', txt); userInput.value='';
             const loadId = 'l-'+Date.now();
-            document.getElementById('chat-history').insertAdjacentHTML('beforeend', `<div class="msg ai" id="${loadId}"><div class="msg-avatar ai"><i class="fa-solid fa-circle-notch fa-spin"></i></div><div class="msg-content text-gray-500">Processing...</div></div>`);
+            document.getElementById('chat-history').insertAdjacentHTML('beforeend', `<div class="msg ai" id="${loadId}"><div class="msg-avatar ai"><i class="fa-solid fa-circle-notch fa-spin"></i></div><div class="msg-content text-gray-500">Đang xử lí...</div></div>`);
             
             try {
                 const res = await fetch(`${API_BASE_URL}/api/chat`, { method:'POST', headers:{'Content-Type':'application/json'},credentials: 'include', body: JSON.stringify({message:txt, conversation_id:currentConvId}) });
